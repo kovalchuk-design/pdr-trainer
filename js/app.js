@@ -80,7 +80,7 @@ function mountShell() {
 
 // ---------- допоміжне ----------
 const fmtTime = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.max(0, Math.floor(s % 60))).padStart(2, '0')}`;
-const fmtDur = (s) => { const h = Math.floor(s / 3600), m = Math.round((s % 3600) / 60); return h ? `${h} год ${m} хв` : `${m} хв`; };
+const fmtDur = (s) => { const h = Math.floor(s / 3600), m = Math.round((s % 3600) / 60); return h ? (m ? `${h}\u00a0год ${m}\u00a0хв` : `${h}\u00a0год`) : `${m}\u00a0хв`; };
 const pct = (x) => `${Math.round(x * 100)}%`;
 function tone(p) { return p >= 85 ? 'ok' : p < 65 ? 'err' : 'acc'; }
 const toneVars = { ok: ['var(--ok-soft)', 'var(--ok-text)', 'var(--ok)'], err: ['var(--err-soft)', 'var(--err-text)', 'var(--err)'], acc: ['var(--accent-soft)', 'var(--accent-text)', 'var(--accent)'], mute: ['var(--chip)', 'var(--muted)', 'var(--bar-soft)'] };
@@ -140,7 +140,7 @@ function questionBody(q, st) {
     ? `<div class="q-body two"><div class="left">${left}</div><div class="right">${right}</div></div>`
     : `<div class="q-body"><div class="right col" style="gap:14px">${right}</div></div>`;
 }
-const secChip = (q) => { const s = DB.secById.get(q.s); return `<span class="chip">${q.s} · ${esc(s.title.length > 34 ? s.title.slice(0, 33) + '…' : s.title)}</span>`; };
+const secChip = (q) => { const s = DB.secById.get(q.s); return `<span class="chip">${q.s} · ${esc(s.title)}</span>`; };
 const saveBtn = (id) => { const on = S.saved.includes(id); return `<button class="icon-btn" data-act="save" data-id="${id}" aria-pressed="${on}" aria-label="${on ? 'Прибрати зі збережених' : 'Зберегти питання'}" style="color:${on ? 'var(--accent-text)' : 'var(--ink)'}"><svg width="22" height="22" viewBox="0 0 24 24" fill="${on ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="${P.saved}"/></svg></button>`; };
 
 function renderSession() {
@@ -154,9 +154,11 @@ function renderLearn(s, q) {
   const n = s.ids.length, pick = s.picks[s.i], answered = pick != null;
   const segs = s.ids.map((id, i) => { const p = s.picks[i]; const c = p == null ? (i === s.i ? 'cur' : '') : p === DB.byId.get(id).a ? 'ok' : 'bad'; return `<i class="${c}"></i>`; }).join('');
   const okN = s.picks.reduce((a, p, i) => a + (p === DB.byId.get(s.ids[i]).a ? 1 : 0), 0);
+  const badN = s.picks.filter((p) => p != null).length - okN;
   const last = s.i === n - 1;
   const html = `<header class="q-head"><button class="icon-btn" data-act="closeSession" aria-label="Закрити сесію">${ic('x')}</button>
-      <div class="segs" style="grid-template-columns:repeat(${n},minmax(0,1fr))" role="img" aria-label="Питання ${s.i + 1} з ${n}, правильно ${okN}">${segs}</div>
+      ${n <= 30 ? `<div class="segs" style="grid-template-columns:repeat(${n},minmax(0,1fr))" role="img" aria-label="Питання ${s.i + 1} з ${n}, правильно ${okN}">${segs}</div>`
+        : `<div class="pbar" role="img" aria-label="Питання ${s.i + 1} з ${n}, правильно ${okN}, помилок ${badN}"><i class="ok" style="width:${(okN / n) * 100}%"></i><i class="bad" style="width:${(badN / n) * 100}%"></i></div>`}
       <span style="font-size:14px;font-weight:700;padding:0 6px 0 10px">${s.i + 1}/${n}</span>${saveBtn(q.id)}</header>
     <div class="q-body chips" style="padding-bottom:0;flex:0"><div class="row" style="gap:8px;flex-wrap:wrap">${secChip(q)}${s.pre[s.i] === 'mistake' ? '<span class="chip err">Повторення помилки</span>' : ''}</div></div>
     ${questionBody(q, { pick, reveal: answered, lock: answered })}
@@ -258,21 +260,21 @@ function renderHome() {
   const goal = S.settings.goal, today = todayCount();
   const mist = c.mistake;
   const weak = weakSections();
-  const html = `<header class="row between"><div class="col" style="gap:6px"><h1 class="h1" style="font-size:26px;line-height:32px">Привіт!</h1>
-      ${ex ? `<span class="row muted" style="gap:8px;font-size:14px"><span style="display:inline-flex;align-items:center;justify-content:center;height:22px;padding:0 8px;border-radius:6px;background:var(--ink);color:var(--bg);font-weight:700;font-size:13px">B</span>Іспит ${ex.label} · ${ex.days > 0 ? `через ${ex.days} ${plural(ex.days, 'день', 'дні', 'днів')}` : ex.days === 0 ? 'сьогодні' : 'дата минула'}</span>`
-        : `<a class="row muted" style="gap:8px;font-size:14px" href="#/settings"><span style="display:inline-flex;align-items:center;justify-content:center;height:22px;padding:0 8px;border-radius:6px;background:var(--ink);color:var(--bg);font-weight:700;font-size:13px">B</span>Додати дату іспиту</a>`}</div>
-      <div class="row" style="gap:8px"><span class="pill warn" aria-label="Серія: ${st} ${plural(st, 'день', 'дні', 'днів')} поспіль">${flame()}${st}</span>
+  const html = `<header class="home-head"><h1 class="h1" style="font-size:26px;line-height:32px">Привіт!</h1>
+      <div class="row" style="gap:8px;margin-left:auto"><span class="pill warn" aria-label="Серія: ${st} ${plural(st, 'день', 'дні', 'днів')} поспіль">${flame()}${st}</span>
         <button class="icon-btn card" data-act="theme" aria-label="${dark ? 'Увімкнути світлу тему' : 'Увімкнути темну тему'}">${ic(dark ? 'sun' : 'moon', 20)}</button>
-        <a class="icon-btn card" href="#/settings" aria-label="Налаштування" style="display:grid;color:var(--ink)">${ic('gear', 20)}</a></div></header>
-    <section class="hero" aria-label="Готовність до іспиту"><div class="row" style="gap:18px"><div class="ring"><svg width="120" height="120" viewBox="0 0 120 120" role="img" aria-label="Готовність ${r} відсотків"><circle cx="60" cy="60" r="52" fill="none" stroke="#2E3546" stroke-width="12"/><circle cx="60" cy="60" r="52" fill="none" stroke="#FFC93C" stroke-width="12" stroke-linecap="round" stroke-dasharray="${(r / 100) * 326.7} 327" transform="rotate(-90 60 60)"/></svg>
+        <a class="icon-btn card" href="#/settings" aria-label="Налаштування" style="display:grid;color:var(--ink)">${ic('gear', 20)}</a></div>
+      ${ex ? `<span class="row muted home-date"><span style="display:inline-flex;align-items:center;justify-content:center;height:22px;padding:0 8px;border-radius:6px;background:var(--ink);color:var(--bg);font-weight:700;font-size:13px">B</span>Іспит ${ex.label} · ${ex.days > 0 ? `через ${ex.days} ${plural(ex.days, 'день', 'дні', 'днів')}` : ex.days === 0 ? 'сьогодні' : 'дата минула'}</span>`
+        : `<a class="row muted home-date" href="#/settings"><span style="display:inline-flex;align-items:center;justify-content:center;height:22px;padding:0 8px;border-radius:6px;background:var(--ink);color:var(--bg);font-weight:700;font-size:13px">B</span>Додати дату іспиту</a>`}</header>
+    <section class="hero" aria-label="Готовність до іспиту"><div class="row" style="gap:18px"><div class="ring"><svg viewBox="0 0 120 120" role="img" aria-label="Готовність ${r} відсотків"><circle cx="60" cy="60" r="52" fill="none" stroke="#2E3546" stroke-width="12"/><circle cx="60" cy="60" r="52" fill="none" stroke="#FFC93C" stroke-width="12" stroke-linecap="round" stroke-dasharray="${(r / 100) * 326.7} 327" transform="rotate(-90 60 60)"/></svg>
         <div><span class="num" style="font-size:28px;line-height:32px">${r}%</span><span style="font-size:12px;color:#B7C0D4">готовність</span></div></div>
-      <div class="col" style="gap:8px;min-width:0">${delta != null && delta !== 0 ? `<span style="display:inline-flex;align-self:flex-start;align-items:center;gap:6px;height:26px;padding:0 10px;border-radius:13px;background:${delta > 0 ? '#1F3B2E' : '#3A1F10'};color:${delta > 0 ? '#7EE2B0' : '#FFB487'};font-size:13px;font-weight:600">${delta > 0 ? ic('up', 12) : ''}${delta > 0 ? '+' : ''}${delta}% за тиждень</span>` : ''}
+      <div class="col hero-text" style="gap:8px;min-width:0">${delta != null && delta !== 0 ? `<span class="pill-delta" style="display:inline-flex;align-self:flex-start;align-items:center;gap:6px;border-radius:13px;background:${delta > 0 ? '#1F3B2E' : '#3A1F10'};color:${delta > 0 ? '#7EE2B0' : '#FFB487'};font-size:13px;font-weight:600">${delta > 0 ? ic('up', 12) : ''}${delta > 0 ? '+' : ''}${delta}% за тиждень</span>` : ''}
         <p style="font-size:18px;line-height:24px;font-weight:700">${msg}</p>
         <p style="font-size:14px;line-height:20px;color:#B7C0D4">${last5.length ? `Останні ${last5.length} ${plural(last5.length, 'пробний іспит', 'пробні іспити', 'пробних іспитів')}: склали ${pass5} з ${last5.length}` : r >= 85 ? 'Спробуйте пробний іспит' : `До цілі 85% залишилось ${left}%`}</p></div></div>
       <div class="col" style="gap:8px"><div class="seg" role="img" aria-label="Засвоєно ${c.mastered}, помилки ${c.mistake}, вчу ${c.learning}, нових ${c.new}"><div style="width:${(c.mastered / tot) * 100}%;background:#3DD68C"></div><div style="width:${(c.mistake / tot) * 100}%;background:#FF8A4C"></div><div style="width:${(c.learning / tot) * 100}%;background:#FFC93C"></div></div>
         <div class="legend"><span><b style="background:#3DD68C"></b>Засвоєно ${c.mastered}</span><span><b style="background:#FF8A4C"></b>Помилки ${c.mistake}</span><span><b style="background:#FFC93C"></b>Вчу ${c.learning}</span><span>з ${tot.toLocaleString('uk')}</span></div></div></section>
     <section class="col" style="gap:10px" aria-label="Почати"><button class="cta" data-act="smart" style="text-align:left"><span class="col" style="gap:2px;flex:1;min-width:0"><span style="font-size:18px;line-height:24px;font-weight:700">${c.attempts ? 'Продовжити навчання' : 'Почати навчання'}</span><span style="font-size:14px;line-height:20px;opacity:.85">Розумна сесія · 10 питань · ~5 хв</span></span><span class="play">${ic('play', 20).replace('fill="none"', 'fill="currentColor"')}</span></button>
-      <div class="tiles"><a class="tile" href="#/exam"><span class="ic" style="background:var(--warn-soft);color:var(--warn-text)">${ic('exam')}</span><span style="font-size:16px;font-weight:700">Пробний іспит</span><span class="small muted">20 питань · 20 хв<br>до 2 помилок</span></a>
+      <div class="tiles"><a class="tile" href="#/exam"><span class="ic" style="background:var(--warn-soft);color:var(--warn-text)">${ic('exam')}</span><span style="font-size:16px;font-weight:700">Пробний іспит</span><span class="small muted">20 питань · 20&nbsp;хв<br>до 2 помилок</span></a>
         <a class="tile" href="#/topics"><span class="ic" style="background:var(--accent-soft);color:var(--accent-text)">${ic('list')}</span><span style="font-size:16px;font-weight:700">Теми ПДР</span><span class="small muted">${DB.sections.length} розділів<br>навчання по темах</span></a></div></section>
     <section class="card" aria-label="Робота над помилками"><div class="row"><span style="width:40px;height:40px;border-radius:12px;background:var(--err-soft);color:var(--err);display:grid;place-items:center">${ic('redo')}</span>
       <div class="col" style="flex:1;min-width:0"><h2 class="h2">Робота над помилками</h2><p class="small muted">Питання зникне зі списку після 2 правильних відповідей поспіль</p></div></div>
@@ -281,7 +283,7 @@ function renderHome() {
     <section class="card" aria-label="Активність"><div class="row between" style="align-items:baseline"><h2 class="h2">Денна ціль</h2><span class="small muted"><b style="color:var(--ink)">${today}</b> з ${goal} ${plural(goal, 'питання', 'питань', 'питань')}</span></div>
       <div class="bar" style="height:10px"><i style="width:${Math.min(100, (today / goal) * 100)}%"></i></div><div class="week">${weekBars()}</div></section>
     <section class="card" style="padding-bottom:6px" aria-label="Слабкі теми"><div class="row between"><h2 class="h2">Слабкі теми</h2><a href="#/topics" class="small" style="font-weight:600;min-height:44px;display:inline-flex;align-items:center">Усі теми</a></div>
-      ${weak.length ? `<div class="list">${weak.map(({ s, st }) => `<a href="#/topic/${s.id}"><span class="badge" style="background:var(--err-soft);color:var(--err-text)">${s.id}</span><span class="col" style="flex:1;min-width:0;gap:6px"><span style="font-size:15px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(s.title)}</span><span class="bar" style="height:6px"><i style="width:${st.acc * 100}%;background:var(--err)"></i></span></span><span style="font-size:14px;font-weight:700;color:var(--err);width:44px;text-align:right">${pct(st.acc)}</span></a>`).join('')}</div>`
+      ${weak.length ? `<div class="list">${weak.map(({ s, st }) => `<a href="#/topic/${s.id}"><span class="badge" style="background:var(--err-soft);color:var(--err-text)">${s.id}</span><span class="col" style="flex:1;min-width:0;gap:6px"><span class="t2">${esc(s.title)}</span><span class="bar" style="height:6px"><i style="width:${st.acc * 100}%;background:var(--err)"></i></span></span><span style="font-size:14px;font-weight:700;color:var(--err);width:44px;text-align:right">${pct(st.acc)}</span></a>`).join('')}</div>`
         : `<p class="muted" style="padding:4px 0 14px">Тут з'являться теми, де ви частіше помиляєтесь. Пройдіть кілька сесій.</p>`}</section>
     ${S.exams.length ? `<section class="col" style="gap:10px" aria-label="Останні пробні іспити"><div class="row between"><h2 class="h2">Останні іспити</h2><a href="#/stats" class="small" style="font-weight:600;min-height:44px;display:inline-flex;align-items:center">Прогрес</a></div>
       <div class="exams5">${S.exams.slice(-5).reverse().map((e) => { const i = S.exams.indexOf(e); return `<a href="#/results/${i}" style="background:${e.pass ? 'var(--ok-soft)' : 'var(--err-soft)'};color:${e.pass ? 'var(--ok-text)' : 'var(--err-text)'}"><b>${e.score}</b><span>${e.pass ? 'склав' : 'не склав'}</span></a>`; }).join('')}</div>
@@ -295,7 +297,7 @@ function topicRow(s) {
   const st = secStats(s.id), p = Math.round(st.know * 100);
   let t = st.attempts === 0 ? 'mute' : tone(p), meta = st.attempts === 0 ? `${s.n} пит. · не почато` : `${s.n} пит. · ${p}%`;
   const [bg, fg, bar] = toneVars[t];
-  return `<a class="topic" href="#/topic/${s.id}"><span class="badge" style="background:${bg};color:${fg}">${s.id}</span><span class="col" style="flex:1;min-width:0;gap:6px"><span class="t" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(s.title)}</span>
+  return `<a class="topic" href="#/topic/${s.id}"><span class="badge" style="background:${bg};color:${fg}">${s.id}</span><span class="col" style="flex:1;min-width:0;gap:6px"><span class="t">${esc(s.title)}</span>
     <span class="row" style="gap:10px"><span class="bar" style="flex:1;height:6px"><i style="width:${st.attempts ? p : 0}%;background:${bar}"></i></span><span class="small muted" style="white-space:nowrap">${meta}</span></span></span></a>`;
 }
 function filteredSections() {
@@ -329,9 +331,9 @@ function renderTopic(sid) {
   const st = secStats(sid);
   setView(`<header class="row"><a class="icon-btn card" href="#/topics" aria-label="До тем" style="display:grid;color:var(--ink)">${ic('back', 20)}</a><span class="chip">Розділ ${s.id}</span></header>
     <h1 class="h1">${esc(s.title)}</h1>
-    <section class="card"><div class="stat4" style="grid-template-columns:repeat(4,minmax(0,1fr))"><div style="padding:10px"><span class="num" style="color:var(--ok)">${st.mastered}</span><span class="small muted">засвоєно</span></div><div style="padding:10px"><span class="num" style="color:var(--err)">${st.mistake}</span><span class="small muted">помилки</span></div><div style="padding:10px"><span class="num" style="color:var(--warn-text)">${st.learning}</span><span class="small muted">вчу</span></div><div style="padding:10px"><span class="num">${st.new}</span><span class="small muted">нові</span></div></div>
+    <section class="card"><div class="stat4"><div><span class="num" style="color:var(--ok)">${st.mastered}</span><span class="small muted">засвоєно</span></div><div><span class="num" style="color:var(--err)">${st.mistake}</span><span class="small muted">помилки</span></div><div><span class="num" style="color:var(--warn-text)">${st.learning}</span><span class="small muted">вчу</span></div><div><span class="num">${st.new}</span><span class="small muted">нові</span></div></div>
       <div class="bar" style="height:10px"><i style="width:${(st.mastered / st.total) * 100}%;background:var(--ok)"></i></div></section>
-    <div class="col" style="gap:10px"><button class="btn" data-act="secTrain" data-sid="${sid}">Тренувати розділ · 10 питань</button>
+    <div class="col" style="gap:10px"><button class="btn" data-act="secTrain" data-sid="${sid}">Тренувати · 10 питань</button>
       <button class="btn sec" data-act="secAll" data-sid="${sid}">Усі ${s.n} ${plural(s.n, 'питання', 'питання', 'питань')} по порядку</button>
       ${st.mistake ? `<button class="btn sec" data-act="secMist" data-sid="${sid}">Тільки помилки · ${st.mistake}</button>` : ''}</div>`, { nav: 'topics' });
 }
@@ -353,7 +355,7 @@ function renderSaved() {
   const qs = S.saved.map((id) => DB.byId.get(id)).filter(Boolean);
   setView(`<header class="row between" style="align-items:baseline"><h1 class="h1">Збережені</h1><span class="small muted">${qs.length} ${plural(qs.length, 'питання', 'питання', 'питань')}</span></header>
     ${qs.length ? `<button class="btn" data-act="trainSaved">Тренувати збережені</button>
-      <div class="col" style="gap:10px">${qs.map((q) => { const e = explanation(q.id); return `<details class="card" style="gap:10px"><summary style="cursor:pointer;font-weight:600;line-height:21px;list-style:none"><span class="small muted">Розділ ${q.s}</span><br>${esc(q.t)}</summary>
+      <div class="col" style="gap:10px">${qs.map((q) => { const e = explanation(q.id); return `<details class="card" style="gap:10px"><summary style="cursor:pointer;font-weight:600;line-height:21px;list-style:none"><span class="small muted">Розділ ${q.s}</span><span>${esc(q.t)}</span></summary>
         ${q.i.length ? `<figure class="q-fig small" style="margin:0"><img src="img/${q.i[0]}" alt="Ілюстрація" data-act="zoom"></figure>` : ''}
         <p style="color:var(--ok-text);font-weight:600" class="row">${ic('check', 18)}<span>${esc(q.o[q.a - 1])}</span></p>${e ? `<p class="small">${esc(e.e)}</p>` : ''}
         <button class="link-btn" style="align-self:flex-start" data-act="save" data-id="${q.id}" data-rerender="1">Прибрати зі збережених</button></details>`; }).join('')}</div>`
@@ -369,23 +371,23 @@ function renderStats() {
   const pts = Object.keys(S.hist).filter((k) => k >= from).sort().map((k) => [k, S.hist[k]]);
   let chart = `<p class="muted small" style="padding:18px 0">Графік з'явиться після кількох днів навчання.</p>`;
   if (pts.length >= 2) {
-    const W = 318, H = 96, x = (i) => (i / (pts.length - 1)) * W, y = (v) => 12 + (1 - v / 100) * H;
+    const pageW = Math.min(innerWidth - (innerWidth >= 900 ? 248 : 0), 1040) - 40, W = Math.max(240, Math.round(pageW - 34)), H = 96, x = (i) => (i / (pts.length - 1)) * W, y = (v) => 12 + (1 - v / 100) * H;
     const line = pts.map(([, v], i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
-    chart = `<svg viewBox="0 0 ${W} 140" width="100%" role="img" aria-label="Готовність від ${pts[0][1]} до ${pts.at(-1)[1]} відсотків; ціль 85 відсотків" style="overflow:visible;display:block"><line x1="0" y1="${y(85)}" x2="${W}" y2="${y(85)}" stroke="var(--ok)" stroke-width="1.5" stroke-dasharray="4 4"/><text x="0" y="${y(85) - 4}" font-size="11" fill="var(--ok-text)" font-weight="600">Ціль 85%</text>
+    chart = `<svg viewBox="0 0 ${W} 140" width="100%" role="img" aria-label="Готовність від ${pts[0][1]} до ${pts.at(-1)[1]} відсотків; ціль 85 відсотків" style="overflow:visible;display:block"><line x1="0" y1="${y(85)}" x2="${W}" y2="${y(85)}" stroke="var(--ok)" stroke-width="1.5" stroke-dasharray="4 4"/><text x="0" y="${y(85) - 4}" font-size="12" fill="var(--ok-text)" font-weight="600">Ціль 85%</text>
       <polygon points="0,${12 + H} ${line} ${W},${12 + H}" fill="var(--accent-soft)"/><polyline points="${line}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/><circle cx="${x(pts.length - 1)}" cy="${y(pts.at(-1)[1])}" r="5" fill="var(--accent)" stroke="var(--card)" stroke-width="2"/>
-      <line x1="0" y1="${12 + H}" x2="${W}" y2="${12 + H}" stroke="var(--border)"/><text x="0" y="136" font-size="11" fill="var(--muted)">${pts[0][0].slice(5).split('-').reverse().join('.')}</text><text x="${W}" y="136" font-size="11" fill="var(--muted)" text-anchor="end">Сьогодні</text></svg>`;
+      <line x1="0" y1="${12 + H}" x2="${W}" y2="${12 + H}" stroke="var(--border)"/><text x="0" y="136" font-size="12" fill="var(--muted)">${pts[0][0].slice(5).split('-').reverse().join('.')}</text><text x="${W}" y="136" font-size="12" fill="var(--muted)" text-anchor="end">Сьогодні</text></svg>`;
   }
   const ex = S.exams.slice(-10), passN = ex.filter((e) => e.pass).length;
   const secs2 = DB.sections.map((s) => ({ s, st: secStats(s.id) })).filter((x) => x.st.attempts > 0).sort((a, b) => a.st.acc - b.st.acc).slice(0, 8);
   setView(`<h1 class="h1">Прогрес</h1>
     <div class="seg-ctl" role="group" aria-label="Період">${[[7, 'Тиждень'], [14, '2 тижні'], [0, 'Весь час']].map(([v, l]) => `<button data-act="period" data-v="${v}" aria-pressed="${statsPeriod === v}">${l}</button>`).join('')}</div>
     <section class="card"><div><h2 class="small muted" style="font-weight:600">Готовність до іспиту</h2><span class="num" style="font-size:28px;line-height:34px">${r}%</span></div>${chart}</section>
-    <section class="stat4"><div><span class="small muted">Відповідей</span><span class="num" style="font-size:22px">${n.toLocaleString('uk')}</span></div><div><span class="small muted">Точність</span><span class="num" style="font-size:22px">${n ? pct(cor / n) : '—'}</span></div>
-      <div><span class="small muted">Час навчання</span><span class="num" style="font-size:22px">${secs ? fmtDur(secs) : '—'}</span></div><div><span class="small muted">Найдовша серія</span><span class="num" style="font-size:22px">${bestStreak()} ${plural(bestStreak(), 'день', 'дні', 'днів')}</span></div></section>
+    <section class="stat4"><div><span class="small muted">Відповідей</span><span class="num stat-v">${n.toLocaleString('uk')}</span></div><div><span class="small muted">Точність</span><span class="num" style="font-size:22px">${n ? pct(cor / n) : '—'}</span></div>
+      <div><span class="small muted">Час навчання</span><span class="num" style="font-size:22px">${secs ? fmtDur(secs) : '—'}</span></div><div><span class="small muted">Найдовша серія</span><span class="num" style="font-size:22px">${bestStreak()}\u00a0${plural(bestStreak(), 'день', 'дні', 'днів')}</span></div></section>
     <section class="card"><div class="row between" style="align-items:baseline"><h2 class="h2">Пробні іспити</h2><span class="small muted">${ex.length ? `склали ${passN} з ${ex.length}` : ''}</span></div>
       ${ex.length ? `<div class="ebars" style="grid-template-columns:repeat(10,minmax(0,1fr))"><div style="position:absolute;left:0;right:0;top:${130 - 100 * 0.9 - 0}px;border-top:1.5px dashed var(--ok);pointer-events:none"></div>${ex.map((e) => `<div><span class="small" style="font-weight:700;color:${e.pass ? 'var(--ok-text)' : 'var(--err-text)'}">${e.score}</span><i style="height:${Math.round((e.score / e.total) * 100)}px;background:${e.pass ? 'var(--ok)' : 'var(--err)'};opacity:${e.pass ? 1 : .6}"></i></div>`).join('')}</div>
         <p class="small muted">Пунктир — прохідний рівень (${EXAM.count - EXAM.maxErrors} з ${EXAM.count})</p>` : `<p class="muted small">Ще немає пробних іспитів.</p>`}</section>
-    <section class="card"><h2 class="h2">Найслабші розділи</h2>${secs2.length ? secs2.map(({ s, st }) => { const p = Math.round(st.acc * 100), t = tone(p); return `<a href="#/topic/${s.id}" class="col" style="gap:6px;color:var(--ink)"><span class="row between small" style="font-size:14px"><span style="font-weight:600">${s.id} · ${esc(s.title.length > 36 ? s.title.slice(0, 35) + '…' : s.title)}</span><b style="color:${toneVars[t][1]}">${p}%</b></span><span class="bar"><i style="width:${p}%;background:${toneVars[t][2]}"></i></span></a>`; }).join('') : `<p class="muted small">Дані з'являться після перших відповідей.</p>`}</section>`, { nav: 'stats', wide: true });
+    <section class="card"><h2 class="h2">Найслабші розділи</h2>${secs2.length ? secs2.map(({ s, st }) => { const p = Math.round(st.acc * 100), t = tone(p); return `<a href="#/topic/${s.id}" class="col weak-row" style="gap:6px;color:var(--ink)"><span class="row between small" style="font-size:14px"><span style="font-weight:600">${s.id} · ${esc(s.title)}</span><b style="color:${toneVars[t][1]}">${p}%</b></span><span class="bar"><i style="width:${p}%;background:${toneVars[t][2]}"></i></span></a>`; }).join('') : `<p class="muted small">Дані з'являться після перших відповідей.</p>`}</section>`, { nav: 'stats', wide: true });
 }
 
 // ---------- налаштування ----------

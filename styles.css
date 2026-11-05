@@ -35,7 +35,7 @@ svg { flex-shrink: 0; }
 .page { width: 100%; max-width: 760px; margin: 0 auto; padding: calc(var(--safe-t) + 28px) 20px 24px; display: flex; flex-direction: column; gap: 16px; }
 .page.wide { max-width: 1040px; }
 #tabs { position: sticky; bottom: 0; background: var(--nav); border-top: 1px solid var(--border); padding: 8px 8px calc(8px + var(--safe-b)); display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); z-index: 5; }
-.tab { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 52px; font-size: 11px; font-weight: 500; color: var(--muted); }
+.tab { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 52px; font-size: 12px; font-weight: 500; color: var(--muted); }
 .tab[aria-current="page"] { color: var(--accent-text); font-weight: 700; }
 @media (min-width: 900px) {
   #tabs { display: none; }
@@ -98,23 +98,27 @@ svg { flex-shrink: 0; }
 .badge { width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center; font-weight: 800; font-size: 13px; flex-shrink: 0; background: var(--chip); }
 .exams5 { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
 .exams5 a { border-radius: 14px; padding: 10px 0; display: flex; flex-direction: column; align-items: center; gap: 2px; }
-.exams5 b { font-weight: 800; font-size: 16px; } .exams5 span { font-size: 11px; }
+.exams5 b { font-weight: 800; font-size: 16px; } .exams5 span { font-size: 12px; }
 
 /* topics */
 .search { display: flex; align-items: center; gap: 10px; height: 48px; padding: 0 14px; border-radius: 14px; background: var(--card); border: 1px solid var(--border); }
 .search input { flex: 1; border: 0; background: none; outline: none; font: inherit; color: var(--ink); min-width: 0; }
 .filters { display: flex; gap: 8px; flex-wrap: wrap; }
-.filter { height: 36px; padding: 0 14px; border-radius: 18px; background: var(--card); border: 1px solid var(--border); font-size: 14px; font-weight: 600; }
+.filter { position: relative; height: 38px; padding: 0 14px; border-radius: 18px; background: var(--card); border: 1px solid var(--border); font-size: 14px; font-weight: 600; }
 .filter[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
-.topic { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--card); border: 1px solid var(--border); border-radius: 16px; color: var(--ink); width: 100%; text-align: left; }
+.topic { min-width: 0; display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--card); border: 1px solid var(--border); border-radius: 16px; color: var(--ink); width: 100%; text-align: left; }
 .topic .badge { width: 44px; height: 44px; border-radius: 12px; }
 .topic .t { font-size: 15px; font-weight: 600; line-height: 19px; }
-.grid2 { display: grid; gap: 8px; }
+.grid2 { display: grid; gap: 8px; grid-template-columns: minmax(0, 1fr); }
 @media (min-width: 900px) { .grid2 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
 /* question */
 .q-head { display: flex; align-items: center; gap: 4px; padding: calc(var(--safe-t) + 8px) 12px 8px; max-width: 1180px; width: 100%; margin: 0 auto; }
-.segs { flex: 1; display: grid; gap: 4px; }
+.segs { flex: 1; min-width: 0; display: grid; gap: 4px; }
+.pbar { flex: 1; min-width: 0; height: 6px; border-radius: 3px; background: #D5DBE6; display: flex; overflow: hidden; }
+:root[data-theme="dark"] .pbar { background: #2E2E2E; }
+.pbar i { display: block; height: 100%; }
+.pbar i.ok { background: var(--ok); } .pbar i.bad { background: var(--err); }
 .segs i { height: 6px; border-radius: 3px; background: #D5DBE6; display: block; }
 :root[data-theme="dark"] .segs i { background: #2E2E2E; }
 .segs i.ok { background: var(--ok); } .segs i.bad { background: var(--err); } .segs i.cur { background: var(--accent); } .segs i.sel { background: var(--accent-text); opacity: .55; }
@@ -203,3 +207,37 @@ dialog.zoom img { display: block; max-width: 92vw; max-height: 84vh; border-radi
 .toast { position: fixed; left: 50%; bottom: calc(80px + var(--safe-b)); transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 12px 18px; border-radius: 14px; font-size: 14px; font-weight: 600; z-index: 50; max-width: calc(100vw - 32px); }
 @media (prefers-reduced-motion: no-preference) { .bar > i, .ebars i { transition: width .4s ease, height .4s ease; } }
 @media (min-width: 900px) { .q-body.chips { max-width: 1180px; padding-top: 8px; } }
+
+/* зручність на телефоні: збільшені зони дотику без зміни вигляду */
+.filter::after { content: ""; position: absolute; inset: -3px 0; }
+.search input { align-self: stretch; height: 100%; }
+.toggle button { height: 44px; min-width: 44px; }
+.seg-ctl button { height: 44px; }
+.set-row input[type=date], .set-row input[type=number] { min-height: 44px; }
+.cell { height: 36px; }
+.cells.light { grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); }
+.cells.light .cell { height: 44px; font-size: 14px; }
+details.card > summary { min-height: 44px; display: flex; flex-direction: column; justify-content: center; }
+.weak-row { min-height: 44px; justify-content: center; }
+.q-fig img { max-height: min(320px, 42vh); }
+@media (min-width: 900px) { .q-fig img { max-height: 520px; } }
+
+/* шапка головної */
+.home-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; }
+.home-date { flex-basis: 100%; gap: 8px; font-size: 14px; min-height: 28px; }
+.home-date > span:first-child { display: inline-flex; align-items: center; justify-content: center; height: 22px; padding: 0 8px; border-radius: 6px; background: var(--ink); color: var(--bg); font-weight: 700; font-size: 13px; flex-shrink: 0; }
+/* назви тем: до двох рядків */
+.topic .t, .t2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.t2 { font-size: 15px; font-weight: 600; line-height: 19px; }
+.chip { height: auto; min-height: 26px; padding: 4px 10px; line-height: 1.25; max-width: 100%; }
+.stat-v { font-size: 22px; }
+.stat4 .num { font-size: 20px; line-height: 26px; }
+/* блок готовності на вузьких екранах */
+.hero .ring { width: 112px; height: 112px; flex-shrink: 0; }
+.hero .ring > svg { width: 100%; height: 100%; }
+.hero .hero-text { min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 359px) { .hero { padding: 16px; } .hero .ring { width: 92px; height: 92px; } .hero .ring .num { font-size: 22px !important; } }
+/* діалоги */
+dialog .btn { padding: 0 14px; min-width: 0; font-size: 16px; }
+
+.hero .pill-delta { white-space: nowrap; height: 26px; font-size: 12px; padding: 0 9px; }
