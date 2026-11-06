@@ -241,3 +241,42 @@ details.card > summary { min-height: 44px; display: flex; flex-direction: column
 dialog .btn { padding: 0 14px; min-width: 0; font-size: 16px; }
 
 .hero .pill-delta { white-space: nowrap; height: 26px; font-size: 12px; padding: 0 9px; }
+
+/* навігація по номерах питань */
+.q-top { width: 100%; max-width: 1180px; margin: 0 auto; padding: calc(var(--safe-t) + 8px) 12px 2px; }
+.q-top-row { display: flex; align-items: center; gap: 4px; }
+.q-count { flex: 1; text-align: center; font-size: 14px; font-weight: 700; }
+.numstrip { position: relative; display: flex; gap: 6px; overflow-x: auto; padding: 6px 4px 10px; margin: 0 -4px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.numstrip::-webkit-scrollbar { display: none; }
+.numstrip > :first-child { margin-left: auto; } .numstrip > :last-child { margin-right: auto; }
+.qn { position: relative; flex: 0 0 40px; height: 44px; border-radius: 12px; border: 1.5px solid var(--border); background: var(--card); color: var(--ink); font-size: 14px; font-weight: 700; display: grid; place-items: center; }
+.qn.ok { background: var(--ok-soft); border-color: var(--ok); color: var(--ok-text); }
+.qn.bad { background: var(--err-soft); border-color: var(--err); color: var(--err-text); }
+.qn.ok::after, .qn.bad::after { position: absolute; top: 2px; right: 4px; font-size: 9px; font-weight: 800; line-height: 1; }
+.qn.ok::after { content: "\2713"; } .qn.bad::after { content: "\2715"; }
+.qn.cur { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+.q-body { padding-bottom: calc(28px + var(--safe-b)); }
+.ex-fin { min-height: 44px; padding: 0 4px; font-size: 15px; font-weight: 600; color: #B7C0D4; border-radius: 12px; }
+.ex-fin.ready { background: var(--accent); color: #fff; padding: 0 16px; font-weight: 700; }
+
+.numstrip.grid { display: grid; grid-template-columns: repeat(var(--cols, 10), minmax(0, 1fr)); gap: 5px; overflow: visible; padding: 6px 0 10px; margin: 0; }
+.numstrip.grid > * { margin: 0 !important; }
+.numstrip.grid .qn { flex: none; min-width: 0; font-size: 14px; }
+
+/* липка компактна шапка з номерами */
+.q-top { position: sticky; top: 0; z-index: 6; background: var(--bg); max-width: none; margin: 0; padding: calc(var(--safe-t) + 6px) 8px 4px; border-bottom: 1px solid var(--border); }
+.q-top > * { max-width: 1164px; margin-left: auto; margin-right: auto; }
+.q-top .numstrip { padding: 4px 0 6px; margin-top: 0; }
+.q-top .numstrip.grid { gap: 4px; }
+.q-top .qn { height: 36px; border-radius: 9px; font-size: 13px; }
+.q-top .numstrip.grid[style*="--cols:10"] .qn { font-size: 13px; }
+.q-top .qn.ok::after, .q-top .qn.bad::after { font-size: 8px; top: 1px; right: 2px; }
+.ex-bar { position: sticky; top: 0; z-index: 6; background: #0E1525; color: #fff; padding: calc(var(--safe-t) + 8px) 16px 6px; }
+.ex-bar-in { max-width: 760px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ex-cells { background: #0E1525; padding: 2px 16px 12px; }
+.ex-cells > nav { max-width: 760px; margin: 0 auto; }
+
+.ex-count { text-align: right; font-size: 15px; font-weight: 700; white-space: nowrap; }
+.ex-bar-in { gap: 6px; }
+.ex-fin.ready { padding: 0 12px; }
+.ex-bar .timer { padding: 0 10px; }

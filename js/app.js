@@ -62,7 +62,7 @@ function confirmBox(title, text, yes, no = 'Скасувати') {
 // ---------- виведення ----------
 let timerId = 0;
 function setView(html, { focus = false, nav = '', wide = false } = {}) {
-  clearInterval(timerId);
+  clearInterval(timerId); clearTimeout(advT);
   document.body.classList.toggle('focus', focus);
   $('#side').style.display = focus ? 'none' : '';
   $('#tabs').style.display = focus ? 'none' : '';
@@ -143,6 +143,42 @@ function questionBody(q, st) {
 const secChip = (q) => { const s = DB.secById.get(q.s); return `<span class="chip">${q.s} · ${esc(s.title)}</span>`; };
 const saveBtn = (id) => { const on = S.saved.includes(id); return `<button class="icon-btn" data-act="save" data-id="${id}" aria-pressed="${on}" aria-label="${on ? 'Прибрати зі збережених' : 'Зберегти питання'}" style="color:${on ? 'var(--accent-text)' : 'var(--ink)'}"><svg width="22" height="22" viewBox="0 0 24 24" fill="${on ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="${P.saved}"/></svg></button>`; };
 
+// ---------- навігація по номерах ----------
+const ADV_LEARN = 800, ADV_EXAM = 250;   // пауза перед автопереходом, мс
+let advT = 0;
+function numCells(states, cur, link) {
+  return states.map((st, i) => {
+    const cls = `qn ${st}${i === cur ? ' cur' : ''}`;
+    const lab = `Питання ${i + 1}${st === 'ok' ? ', правильно' : st === 'bad' ? ', помилка' : ''}${i === cur ? ', поточне' : ''}`;
+    return link
+      ? `<a href="${link}${i}" class="${cls}" aria-label="${lab}"${i === cur ? ' aria-current="true"' : ''}>${i + 1}</a>`
+      : `<a href="#" data-act="goto" data-i="${i}" class="${cls}" aria-label="${lab}"${i === cur ? ' aria-current="true"' : ''}>${i + 1}</a>`;
+  }).join('');
+}
+function stripNav(states, cur, link) {
+  const n = states.length, grid = n <= 20;
+  return `<nav class="numstrip${grid ? ' grid' : ''}"${grid ? ` style="--cols:${Math.min(n, 10)}"` : ''} aria-label="Перехід між питаннями">${numCells(states, cur, link)}</nav>`;
+}
+function centerStrip() {
+  const st = $('.numstrip:not(.grid)'), c = $('.numstrip .cur');
+  if (st && c) st.scrollLeft = c.offsetLeft - (st.clientWidth - c.offsetWidth) / 2;
+}
+function nextTarget(s) {          // найближче питання без відповіді після поточного (по колу)
+  const n = s.ids.length;
+  for (let k = 1; k <= n; k++) { const j = (s.i + k) % n; if (s.picks[j] == null) return j; }
+  return -1;
+}
+function autoAdvance(delay) {
+  clearTimeout(advT);
+  advT = setTimeout(() => {
+    const s = S.session; if (!s || !location.hash.startsWith('#/session')) return;
+    const j = nextTarget(s);
+    if (j >= 0) go(j);
+    else if (s.mode === 'learn') finishLearn();   // в іспиті лишаємось: з'являється «Завершити іспит»
+  }, delay);
+}
+const learnStates = (s) => s.ids.map((id, i) => (s.picks[i] == null ? '' : s.picks[i] === DB.byId.get(id).a ? 'ok' : 'bad'));
+
 function renderSession() {
   const s = S.session;
   if (!s) return (location.hash = S.last ? '#/done' : '#/');
@@ -152,19 +188,14 @@ function renderSession() {
 
 function renderLearn(s, q) {
   const n = s.ids.length, pick = s.picks[s.i], answered = pick != null;
-  const segs = s.ids.map((id, i) => { const p = s.picks[i]; const c = p == null ? (i === s.i ? 'cur' : '') : p === DB.byId.get(id).a ? 'ok' : 'bad'; return `<i class="${c}"></i>`; }).join('');
-  const okN = s.picks.reduce((a, p, i) => a + (p === DB.byId.get(s.ids[i]).a ? 1 : 0), 0);
-  const badN = s.picks.filter((p) => p != null).length - okN;
-  const last = s.i === n - 1;
-  const html = `<header class="q-head"><button class="icon-btn" data-act="closeSession" aria-label="Закрити сесію">${ic('x')}</button>
-      ${n <= 30 ? `<div class="segs" style="grid-template-columns:repeat(${n},minmax(0,1fr))" role="img" aria-label="Питання ${s.i + 1} з ${n}, правильно ${okN}">${segs}</div>`
-        : `<div class="pbar" role="img" aria-label="Питання ${s.i + 1} з ${n}, правильно ${okN}, помилок ${badN}"><i class="ok" style="width:${(okN / n) * 100}%"></i><i class="bad" style="width:${(badN / n) * 100}%"></i></div>`}
-      <span style="font-size:14px;font-weight:700;padding:0 6px 0 10px">${s.i + 1}/${n}</span>${saveBtn(q.id)}</header>
+  const st = learnStates(s), okN = st.filter((x) => x === 'ok').length, badN = st.filter((x) => x === 'bad').length;
+  const html = `<header class="q-top"><div class="q-top-row"><button class="icon-btn" data-act="closeSession" aria-label="Закрити сесію">${ic('x')}</button>
+      <div class="q-count" aria-live="polite">Питання ${s.i + 1} з ${n}<span class="sr">, правильно ${okN}, помилок ${badN}</span></div>${saveBtn(q.id)}</div>
+      ${stripNav(st, s.i)}</header>
     <div class="q-body chips" style="padding-bottom:0;flex:0"><div class="row" style="gap:8px;flex-wrap:wrap">${secChip(q)}${s.pre[s.i] === 'mistake' ? '<span class="chip err">Повторення помилки</span>' : ''}</div></div>
-    ${questionBody(q, { pick, reveal: answered, lock: answered })}
-    <footer class="q-foot"><div>${s.i > 0 ? `<button class="btn sec" data-act="prev">${ic('back', 20)}<span class="hide-sm">Назад</span></button>` : ''}
-      <button class="btn" data-act="${last ? 'finishLearn' : 'next'}" ${answered ? '' : 'disabled'}>${last ? 'Завершити' : 'Далі'}${ic('next', 20)}</button></div></footer>`;
+    ${questionBody(q, { pick, reveal: answered, lock: answered })}`;
   setView(html, { focus: true });
+  centerStrip();
   s.qs = s.qs || Date.now();
 }
 
@@ -173,15 +204,13 @@ function examCells(s, cur) {
 }
 function renderExam(s, q) {
   const n = s.ids.length, left = Math.max(0, s.limit - Math.floor((Date.now() - s.start) / 1000));
-  const answered = s.picks.filter((p) => p != null).length, pick = s.picks[s.i], last = s.i === n - 1;
-  const html = `<header class="ex-head"><div class="row between"><button class="row" data-act="endExam" style="min-height:44px;font-size:15px;font-weight:600;color:#B7C0D4">Завершити</button>
+  const answered = s.picks.filter((p) => p != null).length, pick = s.picks[s.i], all = answered === n;
+  const html = `<div class="ex-bar"><div class="ex-bar-in"><button class="row ex-fin${all ? ' ready' : ''}" data-act="endExam">Завершити</button>
       <div class="timer ${left < 120 ? 'low' : ''}" role="timer" aria-label="Залишилось ${fmtTime(left)}">${ic('exam', 18).replace('currentColor', '#FFC93C')}<span class="num" id="timer" style="font-size:16px">${fmtTime(left)}</span></div>
-      <span style="min-width:76px;text-align:right;font-size:15px;font-weight:700">${answered} <span style="color:#B7C0D4;font-weight:500">з ${n}</span></span></div>
-      <div><nav class="cells" aria-label="Перехід між питаннями">${examCells(s, s.i)}</nav></div></header>
+      <span class="ex-count">${answered} <span style="color:#B7C0D4;font-weight:500">з ${n}</span></span></div></div>
+    <div class="ex-cells"><nav class="cells" aria-label="Перехід між питаннями">${examCells(s, s.i)}</nav></div>
     ${questionBody(q, { pick, reveal: false, lock: false })}
-    <footer class="q-foot"><div>${s.i > 0 ? `<button class="btn sec" data-act="prev">${ic('back', 20)}<span class="hide-sm">Назад</span></button>` : ''}
-      ${s.i < n - 1 ? `<button class="btn sec" data-act="next" style="flex:0 0 auto">Пропустити</button>` : ''}
-      <button class="btn" data-act="${last ? 'endExam' : 'next'}">${last ? 'Завершити іспит' : 'Далі'}${last ? '' : ic('next', 20)}</button></div></footer>`;
+    ${all ? `<div class="q-body" style="padding-top:0;flex:0"><button class="btn" data-act="endExam" style="width:100%">Завершити іспит</button></div>` : ''}`;
   setView(html, { focus: true });
   const tick = () => {
     const l = Math.max(0, s.limit - Math.floor((Date.now() - s.start) / 1000));
@@ -224,16 +253,18 @@ function resultsHTML(run, key) {
 
 function renderReview(key, i) {
   const run = getRun(key); if (!run) return (location.hash = '#/');
-  i = Math.max(0, Math.min(run.ids.length - 1, Number(i)));
-  const q = DB.byId.get(run.ids[i]), pick = run.picks[i], n = run.ids.length;
+  const n = run.ids.length;
+  i = Math.max(0, Math.min(n - 1, Number(i)));
+  const q = DB.byId.get(run.ids[i]), pick = run.picks[i];
   const ok = pick === q.a;
-  const html = `<header class="q-head"><a class="icon-btn" href="#/${key === 'last' ? 'done' : 'results/' + key}" aria-label="До результатів">${ic('back')}</a>
-      <div style="flex:1;text-align:center;font-size:14px;font-weight:700">Питання ${i + 1} з ${n}</div>${saveBtn(q.id)}</header>
+  const st = run.ids.map((id, k) => (run.picks[k] == null ? '' : run.picks[k] === DB.byId.get(id).a ? 'ok' : 'bad'));
+  const html = `<header class="q-top"><div class="q-top-row"><a class="icon-btn" href="#/${key === 'last' ? 'done' : 'results/' + key}" aria-label="До результатів">${ic('back')}</a>
+      <div class="q-count">Питання ${i + 1} з ${n}</div>${saveBtn(q.id)}</div>
+      ${stripNav(st, i, `#/review/${key}/`)}</header>
     <div class="q-body chips" style="padding-bottom:0;flex:0"><div class="row" style="gap:8px;flex-wrap:wrap">${secChip(q)}<span class="chip ${pick == null ? '' : ok ? 'ok' : 'err'}">${pick == null ? 'Без відповіді' : ok ? 'Ви відповіли правильно' : 'Ви помилилися'}</span></div></div>
-    ${questionBody(q, { pick, reveal: true, lock: true })}
-    <footer class="q-foot"><div><a class="btn sec" href="#/review/${key}/${Math.max(0, i - 1)}" ${i === 0 ? 'aria-disabled="true" style="opacity:.4;pointer-events:none"' : ''}>${ic('back', 20)}<span class="hide-sm">Попереднє</span></a>
-      <a class="btn" href="#/review/${key}/${Math.min(n - 1, i + 1)}" ${i === n - 1 ? 'aria-disabled="true" style="opacity:.4;pointer-events:none"' : ''}>Наступне${ic('next', 20)}</a></div></footer>`;
+    ${questionBody(q, { pick, reveal: true, lock: true })}`;
   setView(html, { focus: true });
+  centerStrip();
 }
 
 // ---------- головна ----------
@@ -431,18 +462,19 @@ function pick(k) {
   const s = S.session; if (!s) return;
   const q = DB.byId.get(s.ids[s.i]);
   if (s.mode === 'learn') {
-    if (s.picks[s.i] != null) return;
+    if (s.picks[s.i] != null) return;       // відповідь уже дано — лише перегляд
     s.picks[s.i] = k;
     record(q.id, k === q.a, Math.round((Date.now() - s.qs) / 1000));
     const y = scrollY;
     saveNow(); renderSession(); scrollTo(0, y);
-    requestAnimationFrame(() => document.querySelector('.explain, .opt.good')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }));
+    autoAdvance(ADV_LEARN);
   } else {
-    s.picks[s.i] = s.picks[s.i] === k ? undefined : k;
+    s.picks[s.i] = k;                        // в іспиті відповідь можна змінити, повернувшись за номером
     saveNow(); renderSession();
+    autoAdvance(ADV_EXAM);
   }
 }
-function go(i) { const s = S.session; if (!s) return; s.i = Math.max(0, Math.min(s.ids.length - 1, i)); s.qs = Date.now(); saveNow(); renderSession(); }
+function go(i) { const s = S.session; if (!s) return; clearTimeout(advT); s.i = Math.max(0, Math.min(s.ids.length - 1, i)); s.qs = Date.now(); saveNow(); renderSession(); }
 
 document.addEventListener('click', async (e) => {
   const el = e.target.closest('[data-act]'); if (!el) return;
@@ -450,10 +482,7 @@ document.addEventListener('click', async (e) => {
   if (act === 'goto') e.preventDefault();
   switch (act) {
     case 'pick': return pick(Number(d.k));
-    case 'next': return go(S.session.i + 1);
-    case 'prev': return go(S.session.i - 1);
     case 'goto': return go(Number(d.i));
-    case 'finishLearn': return finishLearn();
     case 'closeSession': {
       const s = S.session; const n = s.picks.filter((p) => p != null).length;
       if (!n) { S.session = null; saveNow(); return (location.hash = '#/'); }
@@ -484,7 +513,9 @@ document.addEventListener('click', async (e) => {
     case 'save': {
       const i = S.saved.indexOf(d.id); i >= 0 ? S.saved.splice(i, 1) : S.saved.push(d.id); save();
       toast(i >= 0 ? 'Прибрано зі збережених' : 'Збережено');
-      return d.rerender ? renderSaved() : location.hash.startsWith('#/session') ? renderSession() : route();
+      if (d.rerender) return renderSaved();
+      if (el.classList.contains('icon-btn')) { el.outerHTML = saveBtn(d.id); return; }
+      return route();
     }
     case 'zoom': { const dlg = dialog(`<img src="${el.src}" alt="Збільшена ілюстрація">`, { cls: 'zoom' }); dlg.addEventListener('click', () => dlg.close()); return; }
     case 'flag': {
@@ -518,10 +549,15 @@ document.addEventListener('change', (e) => {
   }
 });
 document.addEventListener('keydown', (e) => {
-  if (!S.session || !location.hash.startsWith('#/session') || e.target.matches('input,textarea') || document.querySelector('dialog[open]')) return;
-  if (/^[1-6]$/.test(e.key)) pick(Number(e.key));
-  else if (e.key === 'Enter' || e.key === 'ArrowRight') { const b = $('.q-foot .btn:not(.sec):not([disabled])'); if (b && e.key === 'Enter') b.click(); else if (e.key === 'ArrowRight' && S.session.i < S.session.ids.length - 1 && (S.session.mode === 'exam' || S.session.picks[S.session.i] != null)) go(S.session.i + 1); }
-  else if (e.key === 'ArrowLeft') go(S.session.i - 1);
+  if (e.target.matches('input,textarea') || document.querySelector('dialog[open]')) return;
+  const h = location.hash;
+  if (S.session && h.startsWith('#/session')) {
+    if (/^[1-6]$/.test(e.key)) pick(Number(e.key));
+    else if (e.key === 'ArrowRight') go(S.session.i + 1);
+    else if (e.key === 'ArrowLeft') go(S.session.i - 1);
+  } else if (h.startsWith('#/review/') && (e.key === 'ArrowRight' || e.key === 'ArrowLeft')) {
+    const [, , , key, i] = h.split('/'); location.hash = `#/review/${key}/${Number(i) + (e.key === 'ArrowRight' ? 1 : -1)}`;
+  }
 });
 addEventListener('hashchange', route);
 
