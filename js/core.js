@@ -179,3 +179,31 @@ export function importJSON(text) {
   if (o.app !== 'pdr-trainer' || !o.data) throw new Error('Невірний файл');
   replaceState(o.data);
 }
+
+// ---------- Правила дорожнього руху (дослівний текст) і прив'язка питань ----------
+export const RULES = { ready: false, meta: null, sections: [], clauses: new Map(), signs: new Map(), marks: new Map(), signGroups: [], markGroups: [], map: {}, list: null };
+export async function loadRules() {
+  try {
+    const [r, m] = await Promise.all([
+      fetch('data/rules.json').then((x) => x.json()),
+      fetch('data/rulemap.json').then((x) => (x.ok ? x.json() : {})).catch(() => ({})),
+    ]);
+    RULES.meta = r.meta; RULES.sections = r.sections; RULES.signGroups = r.sign_groups; RULES.markGroups = r.mark_groups;
+    for (const c of r.clauses) RULES.clauses.set(c.id, c);
+    for (const e of r.signs) for (const i of e.ids) RULES.signs.set(i, e);
+    for (const e of r.marks) for (const i of e.ids) RULES.marks.set(i, e);
+    RULES.list = r; RULES.map = m; RULES.ready = true;
+  } catch { /* правила необов'язкові: застосунок працює й без них */ }
+}
+// елементи для плашки під питанням: [{kind:'p'|'s'|'m', id, title, sub, text, quote}]
+export function ruleItems(qid) {
+  const m = RULES.ready && RULES.map[qid]; if (!m) return [];
+  const out = [];
+  for (const id of m.r || []) { const c = RULES.clauses.get(id); if (c) { const sec = RULES.sections.find((s) => s.id === c.sec); out.push({ kind: 'p', id, title: `ПДР, п. ${id}`, sub: sec ? `Розділ ${sec.id}. ${cap(sec.title)}` : '', text: c.text, quote: m.q, link: `#/rules/${c.sec}/${id}` }); } }
+  for (const id of m.s || []) { const e = RULES.signs.get(id); if (e) { const g = RULES.signGroups.find((x) => x.n === e.grp); out.push({ kind: 's', id, title: `Дорожній знак ${e.label}`, sub: g ? `Додаток 1 · ${g.title}` : 'Додаток 1', text: e.text, quote: m.q, link: `#/rules/signs/${id}` }); } }
+  for (const id of m.m || []) { const e = RULES.marks.get(id); if (e) { const g = RULES.markGroups.find((x) => x.n === e.grp); out.push({ kind: 'm', id, title: `Дорожня розмітка ${e.label}`, sub: g ? `Додаток 2 · ${g.title}` : 'Додаток 2', text: e.text, quote: m.q, link: `#/rules/marks/${id}` }); } }
+  return out;
+}
+export const hasRule = (qid) => !!(RULES.ready && RULES.map[qid]);
+function cap(s) { s = (s || '').toLowerCase(); return s.charAt(0).toUpperCase() + s.slice(1); }
+export const OFFICIAL_URL = 'https://zakon.rada.gov.ua/laws/show/1306-2001-%D0%BF';

@@ -2,6 +2,7 @@ import {
   S, load, save, saveNow, loadData, DB, EXAM, status, counts, secStats, readiness, record, snapshot,
   streak, bestStreak, todayCount, dkey, addDays, examInfo, plural, explanation, pickSmart, pickSection,
   pickExam, pickMistakes, mistakeList, exportJSON, importJSON, resetState,
+  RULES, loadRules, ruleItems, OFFICIAL_URL,
 } from './core.js';
 
 const $ = (s, r = document) => r.querySelector(s);
@@ -20,6 +21,7 @@ const P = {
   x: 'M6 6l12 12M18 6 6 18', check: 'm5 12 5 5 9-10', play: 'M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5Z',
   list: 'M4 5h16M4 12h16M4 19h10', redo: 'M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5', search: 'M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14ZM20 20l-4-4',
   back: 'M19 12H5M11 6l-6 6 6 6', next: 'M5 12h14M13 6l6 6-6 6', flag: 'M4 21V4h12l-1.5 4L16 12H4', bulb: 'M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3Z',
+  book: 'M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5ZM4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5',
   zoom: 'M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7', diamond: 'M12 2 2 12l10 10 10-10ZM12 8v5M12 16h.01', up: 'm5 15 7-7 7 7', chev: 'm9 6 6 6-6 6',
 };
 const ic = (n, s = 22, extra = '') => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" ${extra}><path d="${P[n]}"/></svg>`;
@@ -193,7 +195,7 @@ function renderLearn(s, q) {
       <div class="q-count" aria-live="polite">Питання ${s.i + 1} з ${n}<span class="sr">, правильно ${okN}, помилок ${badN}</span></div>${saveBtn(q.id)}</div>
       ${stripNav(st, s.i)}</header>
     <div class="q-body chips" style="padding-bottom:0;flex:0"><div class="row" style="gap:8px;flex-wrap:wrap">${secChip(q)}${s.pre[s.i] === 'mistake' ? '<span class="chip err">Повторення помилки</span>' : ''}</div></div>
-    ${questionBody(q, { pick, reveal: answered, lock: answered })}`;
+    ${questionBody(q, { pick, reveal: answered, lock: answered })}${answered ? ruleBar(q) : ''}`;
   setView(html, { focus: true });
   centerStrip();
   s.qs = s.qs || Date.now();
@@ -262,9 +264,111 @@ function renderReview(key, i) {
       <div class="q-count">Питання ${i + 1} з ${n}</div>${saveBtn(q.id)}</div>
       ${stripNav(st, i, `#/review/${key}/`)}</header>
     <div class="q-body chips" style="padding-bottom:0;flex:0"><div class="row" style="gap:8px;flex-wrap:wrap">${secChip(q)}<span class="chip ${pick == null ? '' : ok ? 'ok' : 'err'}">${pick == null ? 'Без відповіді' : ok ? 'Ви відповіли правильно' : 'Ви помилилися'}</span></div></div>
-    ${questionBody(q, { pick, reveal: true, lock: true })}`;
+    ${questionBody(q, { pick, reveal: true, lock: true })}${ruleBar(q)}`;
   setView(html, { focus: true });
   centerStrip();
+}
+
+// ---------- Правила дорожнього руху: плашка, нижній аркуш, довідник ----------
+function quoteRe(q) {
+  if (!q) return null;
+  const pat = q.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+').replace(/[’']/g, "[’']").replace(/[“”«»"]/g, '[“”«»"]');
+  try { return new RegExp(pat, 'i'); } catch { return null; }
+}
+const paraHTML = (s) => esc(s).replace(/\n/g, '<br>');
+function hl(text, q) {
+  const re = quoteRe(q), m = re && re.exec(text);
+  if (!m) return paraHTML(text);
+  return paraHTML(text.slice(0, m.index)) + `<mark>${esc(m[0])}</mark>` + paraHTML(text.slice(m.index + m[0].length));
+}
+function excerpt(text, q) {          // довгий пункт: абзац із цитатою й сусідні
+  if (text.length <= 1400) return { html: hl(text, q), cut: false };
+  const re = quoteRe(q), m = re && re.exec(text), paras = text.split('\n');
+  let k = 0;
+  if (m) { let off = 0; for (let i = 0; i < paras.length; i++) { if (m.index < off + paras[i].length + 1) { k = i; break; } off += paras[i].length + 1; } }
+  const from = Math.max(0, k - 1), to = Math.min(paras.length, k + 2);
+  return { html: (from > 0 ? '…<br>' : '') + hl(paras.slice(from, to).join('\n'), q) + (to < paras.length ? '<br>…' : ''), cut: true };
+}
+const editionLine = () => `Постанова КМУ № 1306 від 10.10.2001${RULES.meta?.last_amendment ? ` · редакція зі змінами по ${RULES.meta.last_amendment}` : ''}`;
+let sheetItems = [];
+function ruleBar(q) {
+  const items = ruleItems(q.id); if (!items.length) return '';
+  return `<div class="rule-bar"><button class="rule-pill" data-act="rule" data-q="${q.id}">${ic('book', 22)}<span class="rp-t"><b>Що кажуть правила</b><small>${esc(items[0].title)}${items.length > 1 ? ` · ще ${items.length - 1}` : ''}</small></span>${ic('up', 20)}</button></div>`;
+}
+function ruleCardHTML(it, i) {
+  const ex = excerpt(it.text, it.quote);
+  return `<section class="rule-card" data-i="${i}"><div class="rule-title">${esc(it.title)}</div>${it.sub ? `<div class="small muted">${esc(it.sub)}</div>` : ''}
+    <div class="rule-text">${ex.html}</div>
+    ${ex.cut ? `<button class="link-btn" data-act="ruleFull" style="align-self:flex-start">Показати весь пункт</button>` : ''}
+    <a class="link-btn" href="${it.link}" style="align-self:flex-start;color:var(--accent-text)">Відкрити у розділі «Правила»</a></section>`;
+}
+function openRuleSheet(qid) {
+  clearTimeout(advT);                         // поки читаєте правила, автоперехід не спрацює
+  sheetItems = ruleItems(qid); if (!sheetItems.length) return;
+  const d = dialog(`<div class="sheet-grab" aria-hidden="true"></div>
+    <header class="sheet-head"><h2 class="h2">Що кажуть правила</h2><button class="icon-btn" data-act="closeSheet" aria-label="Закрити">${ic('x')}</button></header>
+    <div class="sheet-body">${sheetItems.map(ruleCardHTML).join('')}
+      <p class="small muted" style="margin-top:4px">${esc(editionLine())}. Цитата підсвічена, текст пункту дослівний.</p>
+      <a class="link-btn" href="${OFFICIAL_URL}" target="_blank" rel="noopener" style="align-self:flex-start">Офіційний текст на zakon.rada.gov.ua</a></div>`, { cls: 'sheet' });
+  return d;
+}
+
+// довідник «Правила»
+let ruleQuery = '';
+const sectionTitle = (s) => { const t = s.title.toLowerCase(); return t.charAt(0).toUpperCase() + t.slice(1); };
+function ruleRow(href, title, sub, snippet = '') {
+  return `<a class="topic" href="${href}"><span class="col" style="flex:1;min-width:0;gap:4px"><span class="t">${esc(title)}</span>${sub ? `<span class="small muted">${esc(sub)}</span>` : ''}${snippet ? `<span class="small" style="color:var(--ink)">${snippet}</span>` : ''}</span>${ic('chev', 18)}</a>`;
+}
+function snippetFor(text, words) {
+  const low = text.toLowerCase(); let p = -1;
+  for (const w of words) { p = low.indexOf(w); if (p >= 0) break; }
+  const s = Math.max(0, p - 50), e = Math.min(text.length, p + 110);
+  let out = esc((s > 0 ? '…' : '') + text.slice(s, e).replace(/\n/g, ' ') + (e < text.length ? '…' : ''));
+  for (const w of words) if (w.length > 2) out = out.replace(new RegExp(w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), (x) => `<mark>${x}</mark>`);
+  return out;
+}
+function ruleSearch(q) {
+  const words = q.toLowerCase().split(/\s+/).filter(Boolean); if (!words.length) return '';
+  const all = (t) => words.every((w) => t.toLowerCase().includes(w));
+  const res = [];
+  for (const c of RULES.list.clauses) if (all(c.text) || all('п. ' + c.id) || c.id === q.trim()) res.push(ruleRow(`#/rules/${c.sec}/${c.id}`, `ПДР, п. ${c.id}`, '', snippetFor(c.text, words)));
+  for (const e of RULES.list.signs) if (all(e.text) || all('знак ' + e.label)) res.push(ruleRow(`#/rules/signs/${e.ids[0]}`, `Знак ${e.label}`, '', snippetFor(e.text, words)));
+  for (const e of RULES.list.marks) if (all(e.text) || all('розмітка ' + e.label)) res.push(ruleRow(`#/rules/marks/${e.ids[0]}`, `Розмітка ${e.label}`, '', snippetFor(e.text, words)));
+  return res.length ? `<p class="small muted">Знайдено: ${res.length}${res.length > 40 ? ' (показано 40)' : ''}</p><div class="grid2">${res.slice(0, 40).join('')}</div>` : '<div class="empty">Нічого не знайдено</div>';
+}
+function renderRules(a, b) {
+  const back = (href, label) => `<header class="row"><a class="icon-btn card" href="${href}" aria-label="Назад" style="display:grid;color:var(--ink)">${ic('back', 20)}</a><span class="chip">${esc(label)}</span></header>`;
+  if (!RULES.ready) return setView(`${back('#/topics', 'Правила')}<p class="muted" role="status">Завантаження правил…</p>`, { nav: 'topics' });
+  const cardOf = (rid, title, sub, text) => `<section class="rule-card" data-rid="${esc(rid)}"><div class="rule-title">${esc(title)}</div>${sub ? `<div class="small muted">${esc(sub)}</div>` : ''}<div class="rule-text">${paraHTML(text)}</div></section>`;
+  let anchor = '';
+  if (!a) {
+    setView(`${back('#/topics', 'Правила дорожнього руху')}<h1 class="h1">Правила</h1><p class="muted small">${esc(editionLine())}. Текст дослівний, з офіційного джерела.</p>
+      <label class="search">${ic('search', 20)}<input type="search" id="rq" placeholder="Пошук: слово або номер пункту" aria-label="Пошук у правилах" value="${esc(ruleQuery)}"></label>
+      <div id="rres"></div>
+      <div id="rhome" class="col" style="gap:8px"><h2 class="small muted" style="font-weight:700;text-transform:uppercase;letter-spacing:.05em">Розділи правил</h2>
+        <div class="grid2">${RULES.sections.map((s) => ruleRow(`#/rules/${s.id}`, `${s.id}. ${sectionTitle(s)}`, `${RULES.list.clauses.filter((c) => c.sec === s.id).length} пунктів`)).join('')}</div>
+        <h2 class="small muted" style="font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-top:8px">Додатки</h2>
+        <div class="grid2">${ruleRow('#/rules/signs', 'Додаток 1. Дорожні знаки', `${RULES.signs.size} знаків і табличок`)}${ruleRow('#/rules/marks', 'Додаток 2. Дорожня розмітка', `${RULES.marks.size} ліній і позначень`)}</div></div>`, { nav: 'topics', wide: true });
+    $('#rres').innerHTML = ruleSearch(ruleQuery); $('#rhome').style.display = ruleQuery.trim() ? 'none' : '';
+    return;
+  }
+  if (a === 'signs' || a === 'marks') {
+    const isS = a === 'signs', list = isS ? RULES.list.signs : RULES.list.marks, groups = isS ? RULES.signGroups : RULES.markGroups;
+    const target = b ? (isS ? RULES.signs : RULES.marks).get(b) : null;
+    setView(`${back('#/rules', isS ? 'Додаток 1' : 'Додаток 2')}<h1 class="h1" style="font-size:24px">${isS ? 'Дорожні знаки' : 'Дорожня розмітка'}</h1>
+      ${groups.map((g) => `<details class="card" ${target && target.grp === g.n ? 'open' : ''} style="gap:10px"><summary style="cursor:pointer;font-weight:700;min-height:44px;display:flex;align-items:center">${g.n}. ${esc(g.title)}</summary>
+        ${list.filter((e) => e.grp === g.n).map((e) => cardOf(e.ids.join(' '), `${isS ? 'Знак' : 'Розмітка'} ${e.label}`, '', e.text)).join('')}</details>`).join('')}`, { nav: 'topics', wide: true });
+    anchor = b;
+  } else {
+    const sec = RULES.sections.find((s) => s.id === a); if (!sec) return (location.hash = '#/rules');
+    const cl = RULES.list.clauses.filter((c) => c.sec === a), i = RULES.sections.indexOf(sec);
+    setView(`${back('#/rules', `Розділ ${sec.id}`)}<h1 class="h1" style="font-size:24px">${sec.id}. ${esc(sectionTitle(sec))}</h1>
+      ${cl.map((c) => cardOf(c.id, `Пункт ${c.id}`, '', c.text)).join('')}
+      <div class="row between" style="gap:10px">${i > 0 ? `<a class="btn sec sm" href="#/rules/${RULES.sections[i - 1].id}">← Розділ ${RULES.sections[i - 1].id}</a>` : '<span></span>'}${i < RULES.sections.length - 1 ? `<a class="btn sec sm" href="#/rules/${RULES.sections[i + 1].id}">Розділ ${RULES.sections[i + 1].id} →</a>` : ''}</div>
+      <a class="link-btn" href="${OFFICIAL_URL}" target="_blank" rel="noopener" style="align-self:flex-start">Офіційний текст на zakon.rada.gov.ua</a>`, { nav: 'topics', wide: true });
+    anchor = b;
+  }
+  if (anchor) requestAnimationFrame(() => { const el = document.querySelector(`[data-rid~="${CSS.escape(anchor)}"]`); if (el) { el.scrollIntoView({ block: 'start' }); el.classList.add('flash'); } });
 }
 
 // ---------- головна ----------
@@ -347,6 +451,7 @@ function renderTopics() {
   const nW = all.filter(({ st }) => st.attempts > 0 && (st.acc < 0.8 || st.mistake > 0)).length, nN = all.filter(({ st }) => !st.attempts).length, nD = all.filter(({ st }) => st.mastered === st.total).length;
   const F = [['all', 'Усі'], ['weak', `Слабкі · ${nW}`], ['new', `Не почато · ${nN}`], ['done', `Вивчено · ${nD}`]];
   setView(`<header class="row between" style="align-items:baseline"><h1 class="h1">Теми</h1><span class="small muted">${DB.sections.length} розділів · ${DB.list.length.toLocaleString('uk')} питань</span></header>
+    <a class="topic" href="#/rules" style="background:var(--accent-soft);border-color:transparent"><span class="badge" style="background:var(--accent);color:#fff">${ic('book', 22)}</span><span class="col" style="flex:1;min-width:0;gap:2px"><span class="t" style="font-size:16px">Правила дорожнього руху</span><span class="small muted">Повний текст з пошуком · чинна редакція</span></span>${ic('chev', 18)}</a>
     <label class="search">${ic('search', 20)}<input type="search" id="tq" placeholder="Пошук теми" aria-label="Пошук теми" value="${esc(topicQuery)}"></label>
     <div class="filters" role="group" aria-label="Фільтр">${F.map(([k, l]) => `<button class="filter" data-act="filter" data-k="${k}" aria-pressed="${topicFilter === k}">${l}</button>`).join('')}</div>
     <div class="grid2" id="tlist"></div>`, { nav: 'topics', wide: true });
@@ -453,6 +558,7 @@ function route() {
     case 'results': { const run = getRun(b); if (!run) return (location.hash = '#/'); return setView(resultsHTML(run, b), { focus: true }); }
     case 'done': { if (!S.last) return (location.hash = '#/'); return setView(resultsHTML(S.last, 'last'), { focus: true }); }
     case 'review': return renderReview(b, c);
+    case 'rules': return renderRules(b ? decodeURIComponent(b) : '', c ? decodeURIComponent(c) : '');
     default: return renderHome();
   }
 }
@@ -477,6 +583,7 @@ function pick(k) {
 function go(i) { const s = S.session; if (!s) return; clearTimeout(advT); s.i = Math.max(0, Math.min(s.ids.length - 1, i)); s.qs = Date.now(); saveNow(); renderSession(); }
 
 document.addEventListener('click', async (e) => {
+  const lnk = e.target.closest('dialog.sheet a[href^="#/"]'); if (lnk) lnk.closest('dialog').close();
   const el = e.target.closest('[data-act]'); if (!el) return;
   const act = el.dataset.act, d = el.dataset;
   if (act === 'goto') e.preventDefault();
@@ -517,6 +624,9 @@ document.addEventListener('click', async (e) => {
       if (el.classList.contains('icon-btn')) { el.outerHTML = saveBtn(d.id); return; }
       return route();
     }
+    case 'rule': return openRuleSheet(d.q);
+    case 'closeSheet': return el.closest('dialog')?.close();
+    case 'ruleFull': { const card = el.closest('.rule-card'), it = sheetItems[Number(card.dataset.i)]; card.querySelector('.rule-text').innerHTML = hl(it.text, it.quote); el.remove(); return; }
     case 'zoom': { const dlg = dialog(`<img src="${el.src}" alt="Збільшена ілюстрація">`, { cls: 'zoom' }); dlg.addEventListener('click', () => dlg.close()); return; }
     case 'flag': {
       const dlg = dialog(`<form method="dialog" class="col" style="gap:12px"><h2 class="h2">Помилка в питанні</h2><p class="small muted">Що не так? (необов'язково) Нотатка збережеться на цьому пристрої.</p>
@@ -540,6 +650,7 @@ document.addEventListener('click', async (e) => {
 });
 document.addEventListener('input', (e) => {
   if (e.target.id === 'tq') { topicQuery = e.target.value; fillTopics(); }
+  if (e.target.id === 'rq') { ruleQuery = e.target.value; $('#rres').innerHTML = ruleSearch(ruleQuery); $('#rhome').style.display = ruleQuery.trim() ? 'none' : ''; }
 });
 document.addEventListener('change', (e) => {
   if (e.target.id === 'exd') { S.settings.examDate = e.target.value; save(); }
@@ -565,8 +676,10 @@ addEventListener('hashchange', route);
 (async function init() {
   load(); applyTheme(); mountShell();
   $('#view').innerHTML = '<div class="page"><p class="muted" role="status">Завантаження питань…</p></div>';
+  const rp = loadRules();
   try { await loadData(); } catch { $('#view').innerHTML = '<div class="page"><p>Не вдалося завантажити базу питань. Перевірте з\'єднання й оновіть сторінку.</p></div>'; return; }
   if (S.session?.done) S.session = null;
   route();
+  rp.then(() => { if (/^#\/(session|review|rules)/.test(location.hash)) route(); });
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 })();
