@@ -2,7 +2,7 @@ import {
   S, load, save, saveNow, loadData, DB, EXAM, status, counts, secStats, readiness, record, snapshot,
   streak, bestStreak, todayCount, dkey, addDays, examInfo, plural, explanation, pickSmart, pickSection,
   pickExam, pickMistakes, mistakeList, exportJSON, importJSON, resetState,
-  RULES, loadRules, ruleItems, OFFICIAL_URL,
+  RULES, loadRules, ruleItems, OFFICIAL_URL, DISPUTED,
 } from './core.js';
 
 const $ = (s, r = document) => r.querySelector(s);
@@ -195,7 +195,7 @@ function renderLearn(s, q) {
       <div class="q-count" aria-live="polite">Питання ${s.i + 1} з ${n}<span class="sr">, правильно ${okN}, помилок ${badN}</span></div>${saveBtn(q.id)}</div>
       ${stripNav(st, s.i)}</header>
     <div class="q-body chips" style="padding-bottom:0;flex:0"><div class="row" style="gap:8px;flex-wrap:wrap">${secChip(q)}${s.pre[s.i] === 'mistake' ? '<span class="chip err">Повторення помилки</span>' : ''}</div></div>
-    ${questionBody(q, { pick, reveal: answered, lock: answered })}${answered ? ruleBar(q) : ''}`;
+    ${answered ? disputeNote(q) : ''}${questionBody(q, { pick, reveal: answered, lock: answered })}${answered ? ruleBar(q) : ''}`;
   setView(html, { focus: true });
   centerStrip();
   s.qs = s.qs || Date.now();
@@ -264,7 +264,7 @@ function renderReview(key, i) {
       <div class="q-count">Питання ${i + 1} з ${n}</div>${saveBtn(q.id)}</div>
       ${stripNav(st, i, `#/review/${key}/`)}</header>
     <div class="q-body chips" style="padding-bottom:0;flex:0"><div class="row" style="gap:8px;flex-wrap:wrap">${secChip(q)}<span class="chip ${pick == null ? '' : ok ? 'ok' : 'err'}">${pick == null ? 'Без відповіді' : ok ? 'Ви відповіли правильно' : 'Ви помилилися'}</span></div></div>
-    ${questionBody(q, { pick, reveal: true, lock: true })}${ruleBar(q)}`;
+    ${disputeNote(q)}${questionBody(q, { pick, reveal: true, lock: true })}${ruleBar(q)}`;
   setView(html, { focus: true });
   centerStrip();
 }
@@ -291,6 +291,10 @@ function excerpt(text, q) {          // довгий пункт: абзац із
 }
 const editionLine = () => `Постанова КМУ № 1306 від 10.10.2001${RULES.meta?.last_amendment ? ` · редакція зі змінами по ${RULES.meta.last_amendment}` : ''}`;
 let sheetItems = [];
+function disputeNote(q) {
+  const d = DISPUTED[q.id]; if (!d) return '';
+  return `<div class="dispute" role="note"><b>Увага: питання може бути застарілим.</b> ${esc(d)} Перевірте за офіційним текстом ПДР.</div>`;
+}
 function ruleBar(q) {
   const items = ruleItems(q.id); if (!items.length) return '';
   return `<div class="rule-bar"><button class="rule-pill" data-act="rule" data-q="${q.id}">${ic('book', 22)}<span class="rp-t"><b>Що кажуть правила</b><small>${esc(items[0].title)}${items.length > 1 ? ` · ще ${items.length - 1}` : ''}</small></span>${ic('up', 20)}</button></div>`;

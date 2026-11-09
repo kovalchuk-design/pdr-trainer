@@ -1,6 +1,6 @@
 // Service worker: офлайн-режим. Оболонка й дані — кеш + оновлення у фоні; картинки — кеш при першому перегляді.
-const V = 'pdr-v8';
-const SHELL = ['./', 'index.html', 'styles.css', 'js/app.js', 'js/core.js', 'manifest.webmanifest', 'data/questions.json', 'data/explanations.json', 'data/rules.json', 'data/rulemap.json', 'icons/icon.svg'];
+const V = 'pdr-v10';
+const SHELL = ['./', 'index.html', 'styles.css', 'js/app.js', 'js/core.js', 'manifest.webmanifest', 'data/questions.json', 'data/explanations.json', 'data/rules.json', 'data/rulemap.json', 'data/disputed.json', 'icons/icon.svg'];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(V).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', (e) => { e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => k !== V).map((k) => caches.delete(k)))).then(() => self.clients.claim())); });
 self.addEventListener('fetch', (e) => {

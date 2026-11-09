@@ -301,3 +301,7 @@ mark { background: #FFE08A; color: #0E1525; border-radius: 3px; padding: 0 1px; 
 :root[data-theme="dark"] mark { background: #6B5300; color: #FFF3C2; }
 .rule-card.flash { animation: flash 2.4s ease-out; }
 @keyframes flash { 0%, 40% { box-shadow: 0 0 0 3px var(--accent); } 100% { box-shadow: 0 0 0 3px transparent; } }
+
+/* попередження про спірне питання */
+.dispute { background: var(--warn-soft); color: var(--warn-text); border-radius: 14px; padding: 10px 12px; font-size: 14px; line-height: 20px; }
+.dispute b { display: block; margin-bottom: 2px; }

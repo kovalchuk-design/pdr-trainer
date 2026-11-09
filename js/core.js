@@ -181,6 +181,7 @@ export function importJSON(text) {
 }
 
 // ---------- Правила дорожнього руху (дослівний текст) і прив'язка питань ----------
+export const DISPUTED = {};
 export const RULES = { ready: false, meta: null, sections: [], clauses: new Map(), signs: new Map(), marks: new Map(), signGroups: [], markGroups: [], map: {}, list: null };
 export async function loadRules() {
   try {
@@ -193,6 +194,7 @@ export async function loadRules() {
     for (const e of r.signs) for (const i of e.ids) RULES.signs.set(i, e);
     for (const e of r.marks) for (const i of e.ids) RULES.marks.set(i, e);
     RULES.list = r; RULES.map = m; RULES.ready = true;
+    try { Object.assign(DISPUTED, await fetch('data/disputed.json').then((x) => x.json())); } catch { /* необов'язково */ }
   } catch { /* правила необов'язкові: застосунок працює й без них */ }
 }
 // елементи для плашки під питанням: [{kind:'p'|'s'|'m', id, title, sub, text, quote}]
